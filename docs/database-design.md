@@ -314,6 +314,10 @@ COMMIT;
 
 The migration creates non-login roles for portal classes. The backend should `SET ROLE` to the least-privileged role for each request. The service role is reserved for trusted server-side workflows and ingestion workers.
 
+The Sprint 1 prototype uses `withActorTransaction` to resolve a development actor, set transaction-local RLS identity values, and run each service workflow inside one transaction. The production authentication adapter must replace the development header and select the corresponding least-privileged database role before the transaction begins.
+
+Sprint 2 keeps this domain boundary: Better Auth will own credentials and sessions, while `identity.user_accounts.authentication_subject` will link the Better Auth user ID to ARISE persons, students, employees, roles, permissions, consent, and RLS context. See [`plans/2026-07-30-sprint-2-auth.md`](plans/2026-07-30-sprint-2-auth.md).
+
 ## Requirements Traceability
 
 | SRS area | Implementation |
