@@ -1,36 +1,31 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ARISE
 
-## Getting Started
+ARISE is a Next.js prototype backend for academic risk intelligence and student support workflows.
 
-First, run the development server:
+Sprint 1 is complete for the agreed prototype scope.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Local Setup
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+1. Install dependencies with `pnpm install`.
+2. Create `.env` with `DATABASE_URL` pointing to a disposable PostgreSQL database.
+3. Apply the schema with `pnpm db:migrate`.
+4. Provision application roles with `pnpm db:provision`.
+5. Load repeatable demo data with `pnpm db:seed`.
+6. Start Next.js with `pnpm dev`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+The seed command prints development actor account IDs. Pass one ID in the `x-arise-actor-id` header when calling the Sprint 1 endpoints. This header is rejected when `NODE_ENV=production`; production authentication is intentionally deferred.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Commands
 
-## Learn More
+- `pnpm dev`: start the development server.
+- `pnpm test`: run the Vitest suite.
+- `npx tsc --noEmit`: run the TypeScript check.
+- `pnpm db:generate`: generate a Drizzle migration from schema changes.
+- `pnpm db:check`: validate the Drizzle migration state.
+- `pnpm db:migrate`: apply generated migrations.
+- `pnpm db:provision`: grant application database roles.
+- `pnpm db:seed`: seed stable demo users and academic data.
 
-To learn more about Next.js, take a look at the following resources:
+## Scope
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Sprint 1 covers faculty attendance and grade writes, rule-based risk evaluation, the student dashboard, confidential support signals, and the counselor support queue. See [`docs/api/sprint-1.md`](docs/api/sprint-1.md) for the API contract and [`docs/requirements.md`](docs/requirements.md) for the approved requirements.

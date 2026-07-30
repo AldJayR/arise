@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { pathToFileURL } from "node:url";
 import { sql } from "drizzle-orm";
 import { createDatabase } from "./client";
@@ -43,5 +44,8 @@ if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
-  await provisionApplicationRoles();
+  void provisionApplicationRoles().catch((error: unknown) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
 }

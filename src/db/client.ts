@@ -12,6 +12,8 @@ export type RlsContext = {
   employeeId?: string;
 };
 
+let defaultDatabase: Database | undefined;
+
 export function createDatabase(config: PoolConfig = {}) {
   const connectionString = config.connectionString ?? process.env.DATABASE_URL;
 
@@ -31,6 +33,11 @@ export function createDatabase(config: PoolConfig = {}) {
     db: drizzle({ client: pool }),
     pool,
   };
+}
+
+export function getDatabase() {
+  defaultDatabase ??= createDatabase().db;
+  return defaultDatabase;
 }
 
 export async function withRlsContext<T>(

@@ -314,6 +314,8 @@ COMMIT;
 
 The migration creates non-login roles for portal classes. The backend should `SET ROLE` to the least-privileged role for each request. The service role is reserved for trusted server-side workflows and ingestion workers.
 
+The Sprint 1 prototype uses `withActorTransaction` to resolve a development actor, set transaction-local RLS identity values, and run each service workflow inside one transaction. The production authentication adapter must replace the development header and select the corresponding least-privileged database role before the transaction begins.
+
 ## Requirements Traceability
 
 | SRS area | Implementation |

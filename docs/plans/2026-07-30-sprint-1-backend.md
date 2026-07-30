@@ -1,5 +1,9 @@
 # Sprint 1 Backend Implementation Plan
 
+**Status:** Complete for the agreed prototype scope.
+
+The implementation covers the backend foundations, development seed, faculty academic workflows, rule-based risk evaluation, student dashboard, confidential support signals, counselor queue, auditing, and API documentation. Integration tests and `pnpm build` are explicitly outside the accepted Sprint 1 verification scope.
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Deliver a two-week prototype backend vertical slice for Faculty attendance and grades, rule-based student risk status, Student dashboard data, confidential support signals, and a Counselor support queue.
