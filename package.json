@@ -7,7 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "biome check",
-    "format": "biome format --write"
+    "format": "biome format --write",
+    "db:generate": "drizzle-kit generate",
+    "db:check": "drizzle-kit check",
+    "db:migrate": "drizzle-kit migrate",
+    "db:provision": "tsx src/db/provision.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
