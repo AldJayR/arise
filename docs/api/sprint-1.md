@@ -8,6 +8,8 @@ Per the agreed acceptance scope, integration tests and `pnpm build` are not requ
 
 ## Development Authentication
 
+This is the current Sprint 1 development authentication contract. Sprint 2 replaces it with Better Auth email/password sessions and registrar-provisioned activation; see [`../plans/2026-07-30-sprint-2-auth.md`](../plans/2026-07-30-sprint-2-auth.md).
+
 Every endpoint requires the account UUID printed by `pnpm db:seed`:
 
 ```http

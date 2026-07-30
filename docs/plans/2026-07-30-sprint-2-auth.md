@@ -1,0 +1,201 @@
+# Sprint 2 Authentication Implementation Plan
+
+> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
+
+**Goal:** Replace Sprint 1 development actor headers with Better Auth email/password sessions, registrar-provisioned activation, Resend email delivery, and authenticated ARISE RBAC/RLS context.
+
+**Architecture:** Better Auth owns authentication credentials, sessions, verification tokens, and password-reset lifecycle in dedicated auth tables. ARISE remains the source of truth for persons, students, employees, account status, roles, permissions, consent, and RLS identity; `identity.user_accounts.authentication_subject` stores the immutable Better Auth user ID. All protected route handlers resolve a Better Auth session server-side, map it to an active ARISE account, and then reuse the existing domain authorization services.
+
+**Tech Stack:** Better Auth, Next.js 16 App Router, Drizzle ORM 1.0.0-rc.4, PostgreSQL, Resend, TypeScript, Vitest, Zod 4.
+
+---
+
+## Approved Decisions
+
+- Authentication method: Better Auth email/password.
+- Account lifecycle: registrar/SIS provisioned only; public sign-up is disabled.
+- Initial access: a one-time activation/password-reset link is sent after provisioning.
+- Email provider: Resend.
+- Student access: the student is provisioned against an existing `identity.students` record, activates their institutional email account, signs in, and completes the privacy-consent flow before cross-departmental records are returned.
+- Authorization source: ARISE `roles`, `permissions`, `user_roles`, and `role_permissions`; do not use Better Auth roles as a second authorization model.
+- Session-to-domain mapping: Better Auth `user.id` maps to `identity.user_accounts.authentication_subject`.
+- Development header: remove `x-arise-actor-id` from protected API authentication rather than carrying two production-capable identity paths.
+- Scope: backend authentication and authorization only; no UI portal implementation in Sprint 2.
+- Verification: run focused tests, TypeScript, Biome, and Drizzle checks; do not require `pnpm build` or database integration tests for acceptance.
+
+## Requirements Mapping
+
+| Requirement | Sprint 2 response |
+| --- | --- |
+| Authenticated faculty/student/counselor preconditions in UC-FAC-007 and UC-STU-007 | Better Auth session validation plus active ARISE account mapping |
+| `STU-FR-011` | Authenticated student privacy-policy read/acceptance flow before dashboard/support data access |
+| `REG-FR-008` | Registrar-only account provisioning and ARISE role/permission assignment service |
+| `NFR-SEC-002` | Server-side ARISE RBAC checks and fixed database-role selection for RLS transactions |
+| `NFR-SEC-004` | Authenticated identity is available to existing audit writes; auth reads/writes use the same audit boundary where applicable |
+| `NFR-SEC-005` | Student identity is resolved from the session and support queue remains counselor-assignment scoped |
+
+## Data Model Boundary
+
+Better Auth tables must not replace ARISE domain identity tables.
+
+- Better Auth `user`: authentication name, email, email verification state, and Better Auth lifecycle timestamps.
+- Better Auth `account`: email/password credential and provider account state.
+- Better Auth `session`: server-managed session token, expiry, and user reference.
+- Better Auth `verification`: activation, email-verification, and reset-password tokens.
+- ARISE `identity.persons`: canonical person profile and institutional contact data.
+- ARISE `identity.students`/`identity.employees`: domain actor identity.
+- ARISE `identity.user_accounts`: active/locked/disabled domain access state plus Better Auth user ID in `authentication_subject`.
+- ARISE roles and permissions: portal authorization and database-role selection.
+
+Generate the Better Auth Drizzle schema with the Better Auth CLI, map the generated models explicitly in the Drizzle adapter, and let Drizzle Kit generate the migration. Do not hand-edit generated migration SQL. Keep the auth tables in a dedicated PostgreSQL namespace or collision-free auth table set after confirming the generated Drizzle declarations support the selected namespace.
+
+## API Contract
+
+Better Auth owns `/api/auth/*` for email sign-in, sign-out, email verification, password reset, and session management. The route handler must be the standard Next.js adapter:
+
+```text
+GET|POST /api/auth/[...all]
+```
+
+ARISE adds registrar provisioning and student consent routes:
+
+| Route | Method | Actor | Behavior |
+| --- | --- | --- | --- |
+| `/api/v1/registrar/auth-users` | POST | Registrar/Admin | Provisions an existing person/student/employee for Better Auth access, assigns ARISE roles, and sends activation email. |
+| `/api/v1/student/privacy-consent` | GET | Student | Returns the currently effective privacy policy and the authenticated student's consent state. |
+| `/api/v1/student/privacy-consent` | POST | Student | Grants consent for the current policy; policy and student identity are resolved server-side. |
+| Existing Sprint 1 routes | Existing methods | Authenticated portal actor | Replace the development header with Better Auth session resolution. |
+
+No public registration, client-supplied ARISE account IDs, client-supplied student IDs, client-selected recipient counselor IDs, or client-selected roles are accepted.
+
+## Environment Contract
+
+Add the following to `.env.example` and document them without committing secrets:
+
+```text
+BETTER_AUTH_SECRET=<minimum-32-character-secret>
+BETTER_AUTH_URL=http://localhost:3000
+RESEND_API_KEY=<resend-api-key>
+AUTH_EMAIL_FROM=ARISE <no-reply@example.edu>
+AUTH_TRUSTED_ORIGINS=http://localhost:3000
+```
+
+Production must use HTTPS, secure cookies, a production trusted-origin allowlist, a Resend verified sender/domain, and a secret managed outside source control.
+
+## Task 1: Better Auth Foundation
+
+**Files:**
+- Modify: `package.json`
+- Modify: `pnpm-lock.yaml`
+- Create: `src/lib/auth.ts`
+- Create: `src/app/api/auth/[...all]/route.ts`
+- Create: `src/db/schema/auth.ts` or the generated Better Auth schema path selected by the CLI
+- Modify: `src/db/schema/index.ts`
+- Modify: `drizzle.config.ts`
+- Create: generated Drizzle migration under `drizzle/`
+- Create: `.env.example`
+
+1. Add `better-auth` and `resend` with `pnpm add`.
+2. Generate the Better Auth Drizzle schema with the Better Auth CLI and configure the adapter with `provider: "pg"` and explicit model/schema mappings.
+3. Configure email/password with public sign-up disabled, email verification enabled, account deletion and unrequested email changes disabled, secure production cookies, trusted origins, and rate limiting.
+4. Configure the Resend sender for verification and reset-password messages through Better Auth callbacks; do not log passwords, tokens, or full activation URLs in production.
+5. Add the standard `toNextJsHandler(auth)` route handler for `/api/auth/[...all]`.
+6. Generate the migration with Drizzle Kit and verify it contains only the generated auth tables and intended namespace objects.
+
+## Task 2: Registrar Provisioning And Activation
+
+**Files:**
+- Create: `src/server/services/auth-provisioning.ts`
+- Create: `src/server/validation/auth.ts`
+- Create: `src/app/api/v1/registrar/auth-users/route.ts`
+- Modify: `src/db/seed.ts`
+- Test: `tests/services/auth-provisioning.test.ts`
+
+1. Validate that the requested ARISE person exists and is active before creating access.
+2. Require an institutional email already stored on the person; do not accept an arbitrary destination email for a student or employee.
+3. Resolve the requested ARISE role codes server-side from the existing roles table and reject unsupported or duplicate assignments.
+4. Create the Better Auth user through a server-only provisioning path with no public signup dependency, then create/link `identity.user_accounts.authentication_subject` to the Better Auth user ID.
+5. Treat the Better Auth user ID as an opaque string; do not force it into the UUID domain columns.
+6. Send a one-time activation/password-reset email through Resend after the ARISE link is established. If linking fails after Better Auth creation, leave the account unusable and return a controlled error; do not send activation mail.
+7. Make repeated provisioning idempotent by returning a conflict for an already active link and allowing an explicit resend-activation operation later without creating another domain account.
+8. Update demo seed data to create/link Better Auth demo users without printing passwords or tokens. Print only safe account identifiers and activation instructions.
+
+## Task 3: Session-Based Actor Resolution
+
+**Files:**
+- Modify: `src/server/auth/actor.ts`
+- Modify: `src/db/client.ts`
+- Modify: all Sprint 1 protected route handlers
+- Modify: `docs/api/sprint-1.md`
+- Test: `tests/server/auth-session.test.ts`
+
+1. Add `resolveAuthenticatedActor(request)` that calls `auth.api.getSession({ headers: request.headers })` server-side.
+2. Reject missing, expired, unverified, or disabled sessions with controlled `401` responses.
+3. Look up `identity.user_accounts` by `authentication_subject = session.user.id`, then load the active person/student/employee identity and ARISE roles.
+4. Preserve `requireActorRole` and the existing service-layer ownership checks; Better Auth proves authentication, while ARISE proves authorization.
+5. Update `withActorTransaction` so every protected route uses the authenticated actor and cannot fall back to a request header.
+6. Select a fixed database role from the resolved ARISE role using a server-owned allowlist such as `arise_app_user`, `arise_app_faculty`, `arise_app_counselor`, `arise_app_registrar`, or `arise_app_admin`. Never interpolate a role received from a request.
+7. Keep transaction-local RLS values derived from the authenticated ARISE account and set them before service queries.
+8. Remove the development actor header from the Sprint 1 API documentation and replace examples with Better Auth cookie/session usage.
+
+## Task 4: Student Consent Gate
+
+**Files:**
+- Create: `src/server/services/consent.ts`
+- Create: `src/app/api/v1/student/privacy-consent/route.ts`
+- Create: `src/server/validation/consent.ts`
+- Modify: `src/server/services/student.ts`
+- Modify: `src/server/services/support.ts`
+- Test: `tests/services/consent.test.ts`
+
+1. Resolve the currently effective privacy policy by effective date on the server.
+2. Return only the authenticated student's consent state; never accept a student ID in the request body or query string.
+3. Insert a granted consent record for the current policy and `confidential_support_signal`/cross-departmental processing purposes using the existing normalized tables.
+4. Make consent acceptance idempotent and reject attempts to grant consent for superseded policies.
+5. Gate dashboard cross-departmental data and support-signal creation when required consent is absent, returning a stable `consent_required` response that contains the policy metadata but no protected academic records.
+6. Do not treat Better Auth email verification as privacy consent; both checks are required.
+
+## Task 5: RBAC And Access Lifecycle
+
+**Files:**
+- Create: `src/server/services/authorization.ts`
+- Modify: `src/server/auth/actor.ts`
+- Modify: `src/server/services/auth-provisioning.ts`
+- Modify: `src/db/provision.ts`
+- Test: `tests/services/authorization.test.ts`
+
+1. Add a small `requireActorPermission` helper that evaluates the authenticated actor's ARISE role/permission assignments without introducing a generic authorization framework.
+2. Protect registrar provisioning with an ARISE registrar/admin permission, not a Better Auth admin role.
+3. Keep student, faculty, counselor, registrar, dean, auditor, service, and admin role codes in the existing identity model.
+4. Ensure locked/disabled ARISE accounts cannot use valid Better Auth sessions to access API routes.
+5. Ensure session authentication does not grant access to a person lacking an active `user_accounts` link.
+6. Keep support signal visibility assignment-scoped and preserve the existing audit event actor identity.
+7. Update role grants and fixed database-role mapping only through reviewed server code and deployment-owner provisioning.
+
+## Task 6: Documentation And Verification
+
+**Files:**
+- Create: `docs/api/sprint-2-auth.md`
+- Modify: `README.md`
+- Modify: `docs/api/sprint-1.md`
+- Modify: `docs/database-design.md`
+- Modify: `docs/requirements.md` only if implementation notes or traceability need clarification
+
+1. Document environment variables, Better Auth endpoints, Resend activation/reset behavior, registrar provisioning, student activation, consent gating, session cookies, and expected error codes.
+2. Document that Better Auth authenticates users while ARISE owns domain identity, roles, permissions, and RLS context.
+3. Add a Sprint 2 requirement mapping for the authentication preconditions, `STU-FR-011`, `REG-FR-008`, `NFR-SEC-002`, `NFR-SEC-004`, and `NFR-SEC-005`.
+4. Run `pnpm test`, `npx tsc --noEmit`, targeted Biome checks, and `pnpm db:check`.
+5. Do not run `pnpm build` or add database integration tests to Sprint 2 acceptance unless the scope is explicitly changed.
+
+## Sprint 2 Acceptance Criteria
+
+- Public email/password signup is disabled.
+- A registrar/admin can provision an existing active student, faculty, or counselor identity using its institutional email and ARISE role assignments.
+- Provisioning links Better Auth `user.id` to `identity.user_accounts.authentication_subject` and sends a Resend activation/reset email.
+- A student can activate the account, verify the institutional email, sign in, and receive a Better Auth session.
+- Missing, expired, unverified, disabled, unlinked, and unauthorized sessions receive controlled errors.
+- Existing Sprint 1 endpoints resolve actor identity from the Better Auth session and never trust client-supplied student or employee IDs.
+- A student cannot receive dashboard or confidential support processing before granting the current privacy consent.
+- Faculty, counselor, registrar, and student access remains governed by ARISE roles, permissions, ownership checks, and transaction-local RLS context.
+- Password reset and verification links are delivered by Resend without credentials or tokens being logged.
+- No Better Auth role model, public registration path, duplicate student identity table, or generic authorization framework is introduced.
