@@ -15,7 +15,7 @@
 - Derived dashboard values are query projections, not duplicated source columns.
 - Financial data is represented only by `hold_active boolean`; no monetary column exists.
 - Sensitive tables use PostgreSQL RLS. Application roles are `NOLOGIN`, `NOSUPERUSER`, `NOBYPASSRLS`, and do not own application tables.
-- Audit RLS permits service/admin inserts and auditor reads, with no update/delete policies for application roles.
+- Audit RLS permits actor-scoped inserts and reads for the authenticated mutation workflow, plus service/admin inserts and auditor reads. Application roles have no update/delete policies.
 
 ## Repository Layout
 
@@ -318,7 +318,7 @@ The migration creates non-login roles for portal classes. The backend should `SE
 
 Sprint 2 keeps this domain boundary: Better Auth owns credentials and sessions, while `identity.user_accounts.authentication_subject` links the Better Auth user ID to ARISE persons, students, employees, roles, permissions, consent, and RLS context. Better Auth Admin metadata is limited to server-side authentication lifecycle operations and never authorizes ARISE domain access. See [`plans/2026-07-30-sprint-2-auth.md`](plans/2026-07-30-sprint-2-auth.md).
 
-Sprint 3 uses the existing normalized intervention relations without creating a second workflow model: `counselor_referrals` and `support_signals` are intake facts; `cases` stores one counselor-owned intervention case; `case_status_history` and `intervention_notes` are immutable attributed history. Direct messaging, reminders, notifications, and risk digests remain deferred. See [`plans/2026-07-31-sprint-3-interventions.md`](plans/2026-07-31-sprint-3-interventions.md).
+Sprint 3 uses the existing normalized intervention relations without creating a second workflow model: `counselor_referrals` and `support_signals` are intake facts; `cases` stores one counselor-owned intervention case with an immutable source; `case_status_history` derives current case state; `referral_status_history` derives the compact faculty tracking state; and `intervention_notes` are immutable attributed history. Faculty writes require assigned-section enrollment checks, student writes require the authenticated student's support signal, and counselor writes require the assigned employee identity. Direct messaging, reminders, notifications, and risk digests remain deferred. See [`plans/2026-07-31-sprint-3-interventions.md`](plans/2026-07-31-sprint-3-interventions.md).
 
 ## Requirements Traceability
 

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import type { RlsTransaction } from "@/db/client";
 import { auditEvents } from "@/db/schema";
 import type { Actor } from "@/server/auth/actor";
@@ -23,6 +23,7 @@ export async function recordAuditEvent(
   const [previous] = await transaction
     .select({ eventHash: auditEvents.eventHash })
     .from(auditEvents)
+    .where(eq(auditEvents.actorUserAccountId, input.actor.userAccountId))
     .orderBy(desc(auditEvents.occurredAt))
     .limit(1);
   const payload = JSON.stringify({

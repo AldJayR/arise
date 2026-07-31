@@ -11,6 +11,10 @@ import { forbidden, notFound } from "@/server/http/errors";
 import { recordAuditEvent } from "@/server/services/audit";
 import { requireActorPermission } from "@/server/services/authorization";
 import { requireStudentConsent } from "@/server/services/consent";
+import {
+  appendInitialCaseStatus,
+  createAssignedCase,
+} from "@/server/services/interventions";
 import type { SupportSignalInput } from "@/server/validation/student";
 
 function requireStudent(actor: Actor) {
@@ -65,6 +69,14 @@ export async function createSupportSignal(
       status: supportSignals.status,
     });
 
+  const caseRow = await createAssignedCase(transaction, actor, {
+    studentId,
+    assignedCounselorEmployeeId: assignment.counselorEmployeeId,
+    source: "support_signal",
+    sourceSupportSignalId: signal.id,
+  });
+  await appendInitialCaseStatus(transaction, actor, caseRow);
+
   await recordAuditEvent(transaction, {
     actor,
     action: "insert",
@@ -77,6 +89,7 @@ export async function createSupportSignal(
 
   return {
     id: signal.id,
+    caseId: caseRow.id,
     status: signal.status,
     submittedAt: signal.submittedAt.toISOString(),
   };

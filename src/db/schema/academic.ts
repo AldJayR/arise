@@ -29,8 +29,10 @@ import {
 import { employees, students } from "./identity";
 import {
   adminAccess,
+  appFacultyRole,
   appUserRole,
   canAccessEnrollment,
+  facultyOwnsSection,
   serviceAccess,
   userOwnsStudent,
 } from "./rls";
@@ -180,6 +182,11 @@ export const enrollments = academic.table.withRLS(
     unique("enrollments_student_section_key").on(t.studentId, t.sectionId),
     serviceAccess(),
     adminAccess(),
+    pgPolicy("enrollment_faculty_select", {
+      for: "select",
+      to: appFacultyRole,
+      using: facultyOwnsSection(t.sectionId),
+    }),
     pgPolicy("enrollment_student_select", {
       as: "permissive",
       for: "select",

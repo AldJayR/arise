@@ -55,6 +55,26 @@ export const counselorOwnsStudent = (column: SQLWrapper) =>
     FROM services.counselor_assignments AS ca
     WHERE ca.student_id = ${column}
       AND ca.counselor_employee_id = ${currentEmployeeId}
+      AND ca.effective_from <= now()
+      AND (ca.effective_until IS NULL OR ca.effective_until > now())
+  )`;
+
+export const facultyOwnsSection = (column: SQLWrapper) =>
+  sql`EXISTS (
+    SELECT 1
+    FROM academic.section_instructors AS si
+    WHERE si.section_id = ${column}
+      AND si.employee_id = ${currentEmployeeId}
+  )`;
+
+export const facultyOwnsStudent = (column: SQLWrapper) =>
+  sql`EXISTS (
+    SELECT 1
+    FROM academic.enrollments AS e
+    JOIN academic.section_instructors AS si ON si.section_id = e.section_id
+    WHERE e.student_id = ${column}
+      AND e.status = 'enrolled'
+      AND si.employee_id = ${currentEmployeeId}
   )`;
 
 export const canAccessEnrollment = (column: SQLWrapper) =>

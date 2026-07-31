@@ -2,8 +2,8 @@ import "dotenv/config";
 import { randomBytes } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { and, eq } from "drizzle-orm";
+import { auth } from "@/lib/auth";
 import { createDatabase, type RlsTransaction } from "./client";
-import { user as authUsers } from "./schema/auth";
 import {
   academicTerms,
   attendancePolicies,
@@ -25,7 +25,7 @@ import {
   userAccounts,
   userRoles,
 } from "./schema";
-import { auth } from "@/lib/auth";
+import { user as authUsers } from "./schema/auth";
 
 type DemoActor = {
   key: string;
@@ -94,7 +94,11 @@ const demoPermissions = [
   ["auth:provision", "Provision authentication access for an ARISE identity"],
   ["faculty:attendance", "Manage section attendance"],
   ["faculty:grades", "Manage section grades"],
+  ["faculty:referrals", "Create counselor referrals"],
+  ["faculty:referral-tracking", "Track originated counselor referrals"],
   ["counselor:support-queue", "Read assigned support signals"],
+  ["counselor:cases", "Manage assigned counselor cases"],
+  ["counselor:intervention-notes", "Record assigned case intervention notes"],
 ] as const;
 
 const riskDefaults = [
@@ -210,7 +214,11 @@ async function getOrCreateAccount(
         .set({ authenticationSubject })
         .where(eq(userAccounts.id, existing.id));
     }
-    if (existingAuthUser && actor.role === "registrar" && existingAuthUser.role !== "admin") {
+    if (
+      existingAuthUser &&
+      actor.role === "registrar" &&
+      existingAuthUser.role !== "admin"
+    ) {
       await transaction
         .update(authUsers)
         .set({ role: "admin" })
@@ -366,7 +374,11 @@ export async function seedDevelopmentData() {
         ["student", "student:support-signal"],
         ["faculty", "faculty:attendance"],
         ["faculty", "faculty:grades"],
+        ["faculty", "faculty:referrals"],
+        ["faculty", "faculty:referral-tracking"],
         ["counselor", "counselor:support-queue"],
+        ["counselor", "counselor:cases"],
+        ["counselor", "counselor:intervention-notes"],
         ["registrar", "auth:provision"],
         ["admin", "auth:provision"],
       ]) {
