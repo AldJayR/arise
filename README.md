@@ -32,6 +32,6 @@ Protected API routes resolve Better Auth session cookies and map the authenticat
 
 ## Scope
 
-Sprint 1 domain workflows remain available behind Better Auth sessions. Sprint 2 adds registrar provisioning, activation/reset and verification delivery, authenticated ARISE RBAC/RLS context, and student privacy-consent gating. See [`docs/api/sprint-1.md`](docs/api/sprint-1.md), [`docs/api/sprint-2-auth.md`](docs/api/sprint-2-auth.md), and [`docs/requirements.md`](docs/requirements.md).
+Sprint 1 domain workflows remain available behind Better Auth sessions. Sprint 2 adds registrar provisioning, activation/reset and verification delivery, authenticated ARISE RBAC/RLS context, and student privacy-consent gating. Sprint 3 is planned as the smallest referral-to-case workflow: faculty referrals and student support signals become counselor cases with status tracking and intervention notes. See [`docs/api/sprint-1.md`](docs/api/sprint-1.md), [`docs/api/sprint-2-auth.md`](docs/api/sprint-2-auth.md), [`docs/api/sprint-3-interventions.md`](docs/api/sprint-3-interventions.md), and [`docs/requirements.md`](docs/requirements.md).
 
-See [`docs/plans/2026-07-30-sprint-2-auth.md`](docs/plans/2026-07-30-sprint-2-auth.md) for the next sprint's authentication and authorization plan.
+See [`docs/plans/2026-07-31-sprint-3-interventions.md`](docs/plans/2026-07-31-sprint-3-interventions.md) for the Sprint 3 implementation plan.

@@ -318,6 +318,8 @@ The migration creates non-login roles for portal classes. The backend should `SE
 
 Sprint 2 keeps this domain boundary: Better Auth owns credentials and sessions, while `identity.user_accounts.authentication_subject` links the Better Auth user ID to ARISE persons, students, employees, roles, permissions, consent, and RLS context. Better Auth Admin metadata is limited to server-side authentication lifecycle operations and never authorizes ARISE domain access. See [`plans/2026-07-30-sprint-2-auth.md`](plans/2026-07-30-sprint-2-auth.md).
 
+Sprint 3 uses the existing normalized intervention relations without creating a second workflow model: `counselor_referrals` and `support_signals` are intake facts; `cases` stores one counselor-owned intervention case; `case_status_history` and `intervention_notes` are immutable attributed history. Direct messaging, reminders, notifications, and risk digests remain deferred. See [`plans/2026-07-31-sprint-3-interventions.md`](plans/2026-07-31-sprint-3-interventions.md).
+
 ## Requirements Traceability
 
 | SRS area | Implementation |
