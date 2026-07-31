@@ -6,6 +6,8 @@ Sprint 1 is complete for the agreed prototype scope.
 
 Sprint 2 implements Better Auth email/password access, registrar-provisioned accounts, Resend activation emails, student privacy-consent gating, and authenticated RBAC/RLS context.
 
+Sprint 3 implements the referral-to-case intervention loop: faculty referrals and student support signals create assigned counselor cases, counselors manage immutable status history and intervention notes, and referring faculty can track their own referral status.
+
 ## Local Setup
 
 1. Install dependencies with `pnpm install`.
@@ -32,6 +34,6 @@ Protected API routes resolve Better Auth session cookies and map the authenticat
 
 ## Scope
 
-Sprint 1 domain workflows remain available behind Better Auth sessions. Sprint 2 adds registrar provisioning, activation/reset and verification delivery, authenticated ARISE RBAC/RLS context, and student privacy-consent gating. Sprint 3 is planned as the smallest referral-to-case workflow: faculty referrals and student support signals become counselor cases with status tracking and intervention notes. See [`docs/api/sprint-1.md`](docs/api/sprint-1.md), [`docs/api/sprint-2-auth.md`](docs/api/sprint-2-auth.md), [`docs/api/sprint-3-interventions.md`](docs/api/sprint-3-interventions.md), and [`docs/requirements.md`](docs/requirements.md).
+Sprint 1 domain workflows remain available behind Better Auth sessions. Sprint 2 adds registrar provisioning, activation/reset and verification delivery, authenticated ARISE RBAC/RLS context, and student privacy-consent gating. Sprint 3 adds the smallest referral-to-case workflow with server-resolved counselor ownership, status tracking, and attributed intervention notes. Direct messaging, reminders, notifications, digests, UI portals, integrations, and analytics remain deferred. See [`docs/api/sprint-1.md`](docs/api/sprint-1.md), [`docs/api/sprint-2-auth.md`](docs/api/sprint-2-auth.md), [`docs/api/sprint-3-interventions.md`](docs/api/sprint-3-interventions.md), and [`docs/requirements.md`](docs/requirements.md).
 
 See [`docs/plans/2026-07-31-sprint-3-interventions.md`](docs/plans/2026-07-31-sprint-3-interventions.md) for the Sprint 3 implementation plan.

@@ -10,7 +10,14 @@ import {
 } from "drizzle-orm/pg-core";
 import { auditAction } from "./enums";
 import { students, userAccounts } from "./identity";
-import { appAdminRole, appAuditorRole, appServiceRole } from "./rls";
+import {
+  appAdminRole,
+  appAuditorRole,
+  appCounselorRole,
+  appFacultyRole,
+  appServiceRole,
+  appUserRole,
+} from "./rls";
 
 export const governance = pgSchema("governance");
 
@@ -52,6 +59,36 @@ export const auditEvents = governance.table.withRLS(
       for: "select",
       to: appAuditorRole,
       using: sql`true`,
+    }),
+    pgPolicy("audit_student_select", {
+      for: "select",
+      to: appUserRole,
+      using: sql`actor_user_account_id = nullif(current_setting('app.user_account_id', true), '')::uuid`,
+    }),
+    pgPolicy("audit_faculty_select", {
+      for: "select",
+      to: appFacultyRole,
+      using: sql`actor_user_account_id = nullif(current_setting('app.user_account_id', true), '')::uuid`,
+    }),
+    pgPolicy("audit_counselor_select", {
+      for: "select",
+      to: appCounselorRole,
+      using: sql`actor_user_account_id = nullif(current_setting('app.user_account_id', true), '')::uuid`,
+    }),
+    pgPolicy("audit_student_insert", {
+      for: "insert",
+      to: appUserRole,
+      withCheck: sql`actor_user_account_id = nullif(current_setting('app.user_account_id', true), '')::uuid`,
+    }),
+    pgPolicy("audit_faculty_insert", {
+      for: "insert",
+      to: appFacultyRole,
+      withCheck: sql`actor_user_account_id = nullif(current_setting('app.user_account_id', true), '')::uuid`,
+    }),
+    pgPolicy("audit_counselor_insert", {
+      for: "insert",
+      to: appCounselorRole,
+      withCheck: sql`actor_user_account_id = nullif(current_setting('app.user_account_id', true), '')::uuid`,
     }),
     check(
       "audit_events_target_schema_not_blank",

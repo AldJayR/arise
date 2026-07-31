@@ -22,20 +22,33 @@ export async function provisionApplicationRoles() {
       to arise_app_user, arise_app_faculty, arise_app_counselor, arise_app_registrar, arise_app_dean
     `);
     await db.execute(sql`
-      grant insert on services.attendance_policy_acknowledgments, services.consent_records,
-        services.support_signals, services.message_threads, services.messages
-      to arise_app_user
-    `);
+        grant insert on services.attendance_policy_acknowledgments, services.consent_records,
+        services.support_signals, services.cases, services.case_status_history,
+        services.message_threads, services.messages
+        to arise_app_user
+      `);
     await db.execute(sql`
-      grant select, insert, update on services.counselor_referrals, services.referral_status_history
-      to arise_app_faculty
-    `);
+        grant select, insert, update on services.counselor_referrals
+        to arise_app_faculty
+      `);
+    await db.execute(sql`
+        grant select, insert on services.referral_status_history, services.cases,
+        services.case_status_history
+        to arise_app_faculty
+      `);
+    await db.execute(sql`
+        grant insert on services.referral_status_history, services.case_status_history,
+        services.intervention_notes
+        to arise_app_counselor
+      `);
     await db.execute(sql`
       grant select on governance.audit_events to arise_app_auditor
     `);
     await db.execute(sql`
-      grant insert on governance.audit_events to arise_app_service, arise_app_admin
-    `);
+        grant select, insert on governance.audit_events
+        to arise_app_user, arise_app_faculty, arise_app_counselor,
+          arise_app_service, arise_app_admin
+      `);
     await db.execute(sql`
       grant select, insert, update, delete on all tables in schema identity, academic, services, risk, integration
       to arise_app_service, arise_app_admin

@@ -33,6 +33,7 @@ import {
   canAccessThread,
   counselorOwnsEmployee,
   counselorOwnsStudent,
+  facultyOwnsStudent,
   serviceAccess,
   userOwnsAccount,
   userOwnsStudent,
@@ -153,6 +154,11 @@ export const counselorAssignments = services.table.withRLS(
       to: appCounselorRole,
       using: counselorOwnsEmployee("counselor_employee_id"),
     }),
+    pgPolicy("counselor_assignment_faculty_select", {
+      for: "select",
+      to: appFacultyRole,
+      using: facultyOwnsStudent(t.studentId),
+    }),
     serviceAccess(),
     adminAccess(),
     check(
@@ -234,12 +240,31 @@ export const counselorReferrals = services.table.withRLS(
     pgPolicy("counselor_referral_faculty_insert", {
       for: "insert",
       to: appFacultyRole,
-      withCheck: sql`nullif(current_setting('app.employee_id', true), '')::uuid = ${t.referredByEmployeeId}`,
+      withCheck: sql`nullif(current_setting('app.employee_id', true), '')::uuid = ${t.referredByEmployeeId}
+        AND EXISTS (
+          SELECT 1
+          FROM academic.section_instructors AS si
+          WHERE si.section_id = ${t.sectionId}
+            AND si.employee_id = nullif(current_setting('app.employee_id', true), '')::uuid
+        )
+        AND EXISTS (
+          SELECT 1
+          FROM academic.enrollments AS e
+          WHERE e.section_id = ${t.sectionId}
+            AND e.student_id = ${t.studentId}
+            AND e.status = 'enrolled'
+        )`,
     }),
     pgPolicy("counselor_referral_faculty_select", {
       for: "select",
       to: appFacultyRole,
       using: sql`nullif(current_setting('app.employee_id', true), '')::uuid = ${t.referredByEmployeeId}`,
+    }),
+    pgPolicy("counselor_referral_faculty_update", {
+      for: "update",
+      to: appFacultyRole,
+      using: sql`nullif(current_setting('app.employee_id', true), '')::uuid = ${t.referredByEmployeeId}`,
+      withCheck: sql`nullif(current_setting('app.employee_id', true), '')::uuid = ${t.referredByEmployeeId}`,
     }),
     pgPolicy("counselor_referral_counselor_select", {
       for: "select",
@@ -292,6 +317,28 @@ export const referralStatusHistory = services.table.withRLS(
           AND (ca.effective_until IS NULL OR ca.effective_until > now())
       )`,
     }),
+    pgPolicy("referral_status_faculty_insert", {
+      for: "insert",
+      to: appFacultyRole,
+      withCheck: sql`EXISTS (
+        SELECT 1
+        FROM services.counselor_referrals AS cr
+        WHERE cr.id = ${t.referralId}
+          AND cr.referred_by_employee_id = nullif(current_setting('app.employee_id', true), '')::uuid
+      )
+      AND ${t.changedByEmployeeId} = nullif(current_setting('app.employee_id', true), '')::uuid`,
+    }),
+    pgPolicy("referral_status_counselor_insert", {
+      for: "insert",
+      to: appCounselorRole,
+      withCheck: sql`EXISTS (
+        SELECT 1
+        FROM services.counselor_referrals AS cr
+        WHERE cr.id = ${t.referralId}
+          AND ${counselorOwnsStudent(sql`cr.student_id`)}
+      )
+      AND ${t.changedByEmployeeId} = nullif(current_setting('app.employee_id', true), '')::uuid`,
+    }),
     serviceAccess(),
     adminAccess(),
     index("referral_status_history_referral_idx").on(t.referralId, t.changedAt),
@@ -327,6 +374,41 @@ export const cases = services.table.withRLS(
       to: appCounselorRole,
       using: counselorOwnsEmployee("assigned_counselor_employee_id"),
     }),
+    pgPolicy("case_student_insert", {
+      for: "insert",
+      to: appUserRole,
+      withCheck: sql`${t.source} = 'support_signal'
+        AND ${t.sourceSupportSignalId} IS NOT NULL
+        AND ${t.studentId} = nullif(current_setting('app.student_id', true), '')::uuid
+        AND EXISTS (
+          SELECT 1
+          FROM services.support_signals AS ss
+          WHERE ss.id = ${t.sourceSupportSignalId}
+            AND ss.student_id = ${t.studentId}
+            AND ss.recipient_counselor_employee_id = ${t.assignedCounselorEmployeeId}
+        )`,
+    }),
+    pgPolicy("case_faculty_insert", {
+      for: "insert",
+      to: appFacultyRole,
+      withCheck: sql`${t.source} = 'faculty_referral'
+        AND ${t.sourceSupportSignalId} IS NULL
+        AND EXISTS (
+          SELECT 1
+          FROM services.counselor_referrals AS cr
+          WHERE cr.student_id = ${t.studentId}
+            AND cr.referred_by_employee_id = nullif(current_setting('app.employee_id', true), '')::uuid
+            AND cr.case_id IS NULL
+        )
+        AND EXISTS (
+          SELECT 1
+          FROM services.counselor_assignments AS ca
+          WHERE ca.student_id = ${t.studentId}
+            AND ca.counselor_employee_id = ${t.assignedCounselorEmployeeId}
+            AND ca.effective_from <= now()
+            AND (ca.effective_until IS NULL OR ca.effective_until > now())
+        )`,
+    }),
     serviceAccess(),
     adminAccess(),
     check(
@@ -359,6 +441,40 @@ export const caseStatusHistory = services.table.withRLS(
       to: appCounselorRole,
       using: canAccessCase(t.caseId),
     }),
+    pgPolicy("case_status_student_insert", {
+      for: "insert",
+      to: appUserRole,
+      withCheck: sql`${t.status} = 'pending'
+        AND ${t.changedByEmployeeId} = (
+          SELECT c.assigned_counselor_employee_id
+          FROM services.cases AS c
+          WHERE c.id = ${t.caseId}
+            AND c.student_id = nullif(current_setting('app.student_id', true), '')::uuid
+            AND c.source = 'support_signal'
+        )`,
+    }),
+    pgPolicy("case_status_faculty_insert", {
+      for: "insert",
+      to: appFacultyRole,
+      withCheck: sql`${t.status} = 'pending'
+        AND ${t.changedByEmployeeId} = (
+          SELECT ca.counselor_employee_id
+          FROM services.counselor_referrals AS cr
+          JOIN services.counselor_assignments AS ca ON ca.student_id = cr.student_id
+          WHERE cr.case_id = ${t.caseId}
+            AND cr.referred_by_employee_id = nullif(current_setting('app.employee_id', true), '')::uuid
+            AND ca.effective_from <= now()
+            AND (ca.effective_until IS NULL OR ca.effective_until > now())
+          ORDER BY ca.effective_from DESC
+          LIMIT 1
+        )`,
+    }),
+    pgPolicy("case_status_counselor_insert", {
+      for: "insert",
+      to: appCounselorRole,
+      withCheck: sql`${canAccessCase(t.caseId)}
+        AND ${t.changedByEmployeeId} = nullif(current_setting('app.employee_id', true), '')::uuid`,
+    }),
     serviceAccess(),
     adminAccess(),
     index("case_status_history_case_time_idx").on(t.caseId, t.changedAt),
@@ -385,6 +501,12 @@ export const interventionNotes = services.table.withRLS(
       for: "select",
       to: appCounselorRole,
       using: canAccessCase(t.caseId),
+    }),
+    pgPolicy("intervention_note_counselor_insert", {
+      for: "insert",
+      to: appCounselorRole,
+      withCheck: sql`${canAccessCase(t.caseId)}
+        AND ${t.authorEmployeeId} = nullif(current_setting('app.employee_id', true), '')::uuid`,
     }),
     serviceAccess(),
     adminAccess(),

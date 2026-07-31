@@ -12,7 +12,11 @@ import {
 import { accountStatus, employmentStatus, personStatus } from "./enums";
 import {
   adminAccess,
+  appCounselorRole,
+  appFacultyRole,
   appUserRole,
+  counselorOwnsStudent,
+  facultyOwnsStudent,
   serviceAccess,
   userOwnsPerson,
   userOwnsStudent,
@@ -42,6 +46,29 @@ export const persons = identity.table.withRLS(
       for: "select",
       to: appUserRole,
       using: userOwnsPerson("id"),
+    }),
+    pgPolicy("person_faculty_select", {
+      for: "select",
+      to: appFacultyRole,
+      using: sql`EXISTS (
+        SELECT 1
+        FROM identity.students AS s
+        JOIN academic.enrollments AS e ON e.student_id = s.id
+        JOIN academic.section_instructors AS si ON si.section_id = e.section_id
+        WHERE s.person_id = ${t.id}
+          AND e.status = 'enrolled'
+          AND si.employee_id = nullif(current_setting('app.employee_id', true), '')::uuid
+      )`,
+    }),
+    pgPolicy("person_counselor_select", {
+      for: "select",
+      to: appCounselorRole,
+      using: sql`EXISTS (
+        SELECT 1
+        FROM identity.students AS s
+        WHERE s.person_id = ${t.id}
+          AND ${counselorOwnsStudent(sql`s.id`)}
+      )`,
     }),
     serviceAccess(),
     adminAccess(),
@@ -81,6 +108,16 @@ export const students = identity.table.withRLS(
       for: "select",
       to: appUserRole,
       using: userOwnsStudent("id"),
+    }),
+    pgPolicy("student_faculty_select", {
+      for: "select",
+      to: appFacultyRole,
+      using: facultyOwnsStudent(t.id),
+    }),
+    pgPolicy("student_counselor_select", {
+      for: "select",
+      to: appCounselorRole,
+      using: counselorOwnsStudent(t.id),
     }),
     serviceAccess(),
     adminAccess(),
