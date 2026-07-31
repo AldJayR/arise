@@ -1,7 +1,6 @@
 import { and, desc, eq, gt, inArray, isNull, lte, or } from "drizzle-orm";
 import type { RlsTransaction } from "@/db/client";
 import {
-  consentRecords,
   counselorAssignments,
   persons,
   students,
@@ -10,6 +9,8 @@ import {
 import { type Actor, requireActorRole } from "@/server/auth/actor";
 import { forbidden, notFound } from "@/server/http/errors";
 import { recordAuditEvent } from "@/server/services/audit";
+import { requireActorPermission } from "@/server/services/authorization";
+import { requireStudentConsent } from "@/server/services/consent";
 import type { SupportSignalInput } from "@/server/validation/student";
 
 function requireStudent(actor: Actor) {
@@ -26,21 +27,10 @@ export async function createSupportSignal(
   _input: SupportSignalInput,
 ) {
   const studentId = requireStudent(actor);
-  const [consent] = await transaction
-    .select({ id: consentRecords.id })
-    .from(consentRecords)
-    .where(
-      and(
-        eq(consentRecords.studentId, studentId),
-        eq(consentRecords.purpose, "confidential_support_signal"),
-        eq(consentRecords.state, "granted"),
-        isNull(consentRecords.withdrawnAt),
-      ),
-    )
-    .limit(1);
-  if (!consent) {
-    throw forbidden("Confidential support consent is required");
-  }
+  requireActorPermission(actor, "student:support-signal");
+  await requireStudentConsent(transaction, studentId, [
+    "confidential_support_signal",
+  ]);
 
   const [assignment] = await transaction
     .select({ counselorEmployeeId: counselorAssignments.counselorEmployeeId })
@@ -97,6 +87,7 @@ export async function listCounselorSupportSignals(
   actor: Actor,
 ) {
   requireActorRole(actor, "counselor");
+  requireActorPermission(actor, "counselor:support-queue");
   if (!actor.employeeId) {
     throw forbidden("The counselor actor has no employee identity");
   }

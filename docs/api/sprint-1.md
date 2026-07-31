@@ -1,22 +1,22 @@
 # Sprint 1 API
 
-**Status:** Complete for the agreed prototype scope.
+**Status:** Complete for the agreed domain prototype scope; protected routes now use Sprint 2 Better Auth sessions.
 
 Verified during Sprint 1: `pnpm test`, `npx tsc --noEmit`, targeted Biome checks, `pnpm db:check`, `pnpm db:migrate`, `pnpm db:provision`, and repeatable `pnpm db:seed`.
 
 Per the agreed acceptance scope, integration tests and `pnpm build` are not required for Sprint 1 completion.
 
-## Development Authentication
+## Authentication
 
-This is the current Sprint 1 development authentication contract. Sprint 2 replaces it with Better Auth email/password sessions and registrar-provisioned activation; see [`../plans/2026-07-30-sprint-2-auth.md`](../plans/2026-07-30-sprint-2-auth.md).
+Sprint 2 provides the authentication contract for these routes through Better Auth email/password sessions and registrar-provisioned activation; see [`sprint-2-auth.md`](sprint-2-auth.md) and [`../plans/2026-07-30-sprint-2-auth.md`](../plans/2026-07-30-sprint-2-auth.md).
 
-Every endpoint requires the account UUID printed by `pnpm db:seed`:
+Every protected endpoint requires a valid Better Auth session cookie:
 
-```http
-x-arise-actor-id: <user-account-uuid>
+```text
+Cookie: better-auth.session_token=<session-token>
 ```
 
-The development actor resolver loads the account, person, student/employee identity, active status, and assigned roles server-side. Client-provided student or employee IDs are not used for authorization. The header is rejected in production.
+The server maps `session.user.id` to `identity.user_accounts.authentication_subject`, then loads active ARISE identity, roles, permissions, and transaction-local RLS context. Client-provided student, employee, account, role, and database-role values are not authorization sources.
 
 ## Error Contract
 
@@ -32,7 +32,7 @@ Errors use this shape and never expose database errors:
 }
 ```
 
-`400` means malformed input, `401` means missing or invalid actor, `403` means role or ownership failure, `404` means the resource is absent, `409` means a duplicate, locked, or otherwise conflicting state, and `500` means an unexpected server failure.
+`400` means malformed input, `401` means missing, invalid, unverified, or inactive authentication, `403` means role or ownership failure, `404` means the resource is absent, `409` means a duplicate, locked, or otherwise conflicting state, and `500` means an unexpected server failure. Student dashboard/support actions may return `CONSENT_REQUIRED` with current policy metadata and no protected records.
 
 ## Faculty Sections
 
@@ -108,4 +108,4 @@ The request requires current `confidential_support_signal` consent and an active
 
 ## Deferred
 
-Production authentication, OAuth, external integrations, notifications, QR check-in, offline client queues, imports/exports, messaging, registrar/dean portals, scheduled jobs, and UI implementation remain outside Sprint 1.
+OAuth, external integrations, notifications, QR check-in, offline client queues, imports/exports, messaging, registrar/dean portals, scheduled jobs, and UI implementation remain outside the Sprint 1 domain scope.

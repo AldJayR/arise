@@ -16,6 +16,8 @@ import {
 } from "@/db/schema";
 import { type Actor, requireActorRole } from "@/server/auth/actor";
 import { forbidden, notFound } from "@/server/http/errors";
+import { requireActorPermission } from "@/server/services/authorization";
+import { requireStudentConsent } from "@/server/services/consent";
 import { getCurrentRiskSummaries } from "@/server/services/risk";
 
 function requireStudent(actor: Actor) {
@@ -54,6 +56,10 @@ export async function getStudentDashboard(
   actor: Actor,
 ) {
   const studentId = requireStudent(actor);
+  requireActorPermission(actor, "student:dashboard");
+  await requireStudentConsent(transaction, studentId, [
+    "cross_departmental_records",
+  ]);
   const riskSummary = (
     await getCurrentRiskSummaries(transaction, [studentId])
   ).get(studentId) ?? { severity: "green" as const, signalCount: 0 };

@@ -22,6 +22,7 @@ import {
   notFound,
 } from "@/server/http/errors";
 import { recordAuditEvent } from "@/server/services/audit";
+import { requireActorPermission } from "@/server/services/authorization";
 import { evaluateAndPersistStudentRisk } from "@/server/services/risk";
 import type {
   BulkAttendanceSubmission,
@@ -101,6 +102,7 @@ export async function listFacultySections(
   transaction: RlsTransaction,
   actor: Actor,
 ) {
+  requireActorPermission(actor, "faculty:attendance");
   const employeeId = requireFacultyEmployee(actor);
   const rows = await transaction
     .select({
@@ -130,6 +132,7 @@ export async function getFacultyRoster(
   actor: Actor,
   sectionId: string,
 ) {
+  requireActorPermission(actor, "faculty:attendance");
   const section = await getOwnedSection(transaction, actor, sectionId);
   const [policy] = await transaction
     .select({
@@ -179,6 +182,7 @@ export async function createClassSession(
   sectionId: string,
   input: SessionCreationInput,
 ) {
+  requireActorPermission(actor, "faculty:attendance");
   await getOwnedSection(transaction, actor, sectionId);
   const startsAt = new Date(input.startsAt);
   const endsAt = input.endsAt ? new Date(input.endsAt) : null;
@@ -271,6 +275,7 @@ export async function recordAttendance(
   sectionId: string,
   input: BulkAttendanceSubmission,
 ) {
+  requireActorPermission(actor, "faculty:attendance");
   const employeeId = requireFacultyEmployee(actor);
   await getOwnedSection(transaction, actor, sectionId);
   const enrollmentIds = input.entries.map((entry) => entry.enrollmentId);
@@ -352,6 +357,7 @@ export async function recordGrades(
   sectionId: string,
   input: GradeSubmission,
 ) {
+  requireActorPermission(actor, "faculty:grades");
   const employeeId = requireFacultyEmployee(actor);
   await getOwnedSection(transaction, actor, sectionId);
   const enrollmentIds = input.entries.map((entry) => entry.enrollmentId);

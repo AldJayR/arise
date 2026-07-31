@@ -1,11 +1,12 @@
 import "dotenv/config";
+import { randomBytes } from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { and, eq } from "drizzle-orm";
 import { createDatabase, type RlsTransaction } from "./client";
+import { user as authUsers } from "./schema/auth";
 import {
   academicTerms,
   attendancePolicies,
-  consentRecords,
   counselorAssignments,
   courses,
   employees,
@@ -24,16 +25,16 @@ import {
   userAccounts,
   userRoles,
 } from "./schema";
+import { auth } from "@/lib/auth";
 
 type DemoActor = {
   key: string;
   givenName: string;
   familyName: string;
   email: string;
-  subject: string;
   employeeNumber?: string;
   studentNumber?: string;
-  role: "faculty" | "counselor" | "student";
+  role: "faculty" | "counselor" | "student" | "registrar";
 };
 
 const demoActors: DemoActor[] = [
@@ -42,7 +43,6 @@ const demoActors: DemoActor[] = [
     givenName: "Maya",
     familyName: "Santos",
     email: "maya.santos@demo.arise.local",
-    subject: "demo.faculty.maya-santos",
     employeeNumber: "DEMO-FAC-001",
     role: "faculty",
   },
@@ -51,9 +51,16 @@ const demoActors: DemoActor[] = [
     givenName: "Liam",
     familyName: "Reyes",
     email: "liam.reyes@demo.arise.local",
-    subject: "demo.counselor.liam-reyes",
     employeeNumber: "DEMO-CNS-001",
     role: "counselor",
+  },
+  {
+    key: "registrar",
+    givenName: "Cynthia",
+    familyName: "Garcia",
+    email: "cynthia.garcia@demo.arise.local",
+    employeeNumber: "DEMO-REG-001",
+    role: "registrar",
   },
   ...[
     ["Ari", "Dela Cruz", "DEMO-STU-001"],
@@ -65,7 +72,6 @@ const demoActors: DemoActor[] = [
     givenName,
     familyName,
     email: `${givenName.toLowerCase()}.${familyName.split(" ")[0].toLowerCase()}@demo.arise.local`,
-    subject: `demo.student.${studentNumber.toLowerCase()}`,
     studentNumber,
     role: "student" as const,
   })),
@@ -75,6 +81,9 @@ const demoRoles = [
   ["student", "Student access"],
   ["faculty", "Faculty access"],
   ["counselor", "Counselor access"],
+  ["registrar", "Registrar access"],
+  ["dean", "Dean access"],
+  ["auditor", "Auditor access"],
   ["service", "Service account access"],
   ["admin", "Administrator access"],
 ] as const;
@@ -82,6 +91,7 @@ const demoRoles = [
 const demoPermissions = [
   ["student:dashboard", "Read the student dashboard"],
   ["student:support-signal", "Submit a confidential support signal"],
+  ["auth:provision", "Provision authentication access for an ARISE identity"],
   ["faculty:attendance", "Manage section attendance"],
   ["faculty:grades", "Manage section grades"],
   ["counselor:support-queue", "Read assigned support signals"],
@@ -167,18 +177,51 @@ async function getOrCreateAccount(
   actor: DemoActor,
 ) {
   const [existing] = await transaction
-    .select({ id: userAccounts.id })
+    .select({
+      id: userAccounts.id,
+      authenticationSubject: userAccounts.authenticationSubject,
+    })
     .from(userAccounts)
-    .where(eq(userAccounts.authenticationSubject, actor.subject))
+    .where(eq(userAccounts.personId, personId))
     .limit(1);
 
+  const [existingAuthUser] = await transaction
+    .select({ id: authUsers.id, role: authUsers.role })
+    .from(authUsers)
+    .where(eq(authUsers.email, actor.email))
+    .limit(1);
+  const authenticationSubject =
+    existingAuthUser?.id ??
+    (
+      await auth.api.createUser({
+        body: {
+          email: actor.email,
+          name: `${actor.givenName} ${actor.familyName}`,
+          password: randomBytes(32).toString("base64url"),
+          role: actor.role === "registrar" ? "admin" : "user",
+        },
+      })
+    ).user.id;
+
   if (existing) {
+    if (existing.authenticationSubject !== authenticationSubject) {
+      await transaction
+        .update(userAccounts)
+        .set({ authenticationSubject })
+        .where(eq(userAccounts.id, existing.id));
+    }
+    if (existingAuthUser && actor.role === "registrar" && existingAuthUser.role !== "admin") {
+      await transaction
+        .update(authUsers)
+        .set({ role: "admin" })
+        .where(eq(authUsers.id, existingAuthUser.id));
+    }
     return existing.id;
   }
 
   const [created] = await transaction
     .insert(userAccounts)
-    .values({ personId, authenticationSubject: actor.subject })
+    .values({ personId, authenticationSubject })
     .returning({ id: userAccounts.id });
 
   return created.id;
@@ -291,7 +334,7 @@ export async function seedDevelopmentData() {
 
           if (actor.role === "faculty") {
             facultyEmployeeId = employeeId;
-          } else {
+          } else if (actor.role === "counselor") {
             counselorEmployeeId = employeeId;
           }
         }
@@ -324,6 +367,8 @@ export async function seedDevelopmentData() {
         ["faculty", "faculty:attendance"],
         ["faculty", "faculty:grades"],
         ["counselor", "counselor:support-queue"],
+        ["registrar", "auth:provision"],
+        ["admin", "auth:provision"],
       ]) {
         await transaction
           .insert(rolePermissions)
@@ -473,31 +518,16 @@ export async function seedDevelopmentData() {
         .from(privacyPolicies)
         .where(eq(privacyPolicies.version, "2026.1"))
         .limit(1);
-      const privacyPolicyId =
-        privacyPolicy?.id ??
-        (
-          await transaction
-            .insert(privacyPolicies)
-            .values({
-              version: "2026.1",
-              title: "ARISE Demo Privacy Policy",
-              body: "Demo consent for confidential student support signaling.",
-              effectiveAt: new Date("2026-06-01T00:00:00Z"),
-            })
-            .returning({ id: privacyPolicies.id })
-        )[0].id;
+      if (!privacyPolicy) {
+        await transaction.insert(privacyPolicies).values({
+          version: "2026.1",
+          title: "ARISE Demo Privacy Policy",
+          body: "Demo consent for cross-departmental academic records and confidential student support signaling.",
+          effectiveAt: new Date("2026-06-01T00:00:00Z"),
+        });
+      }
 
       for (const studentId of studentIds) {
-        await transaction
-          .insert(consentRecords)
-          .values({
-            studentId,
-            policyId: privacyPolicyId,
-            purpose: "confidential_support_signal",
-            state: "granted",
-          })
-          .onConflictDoNothing();
-
         const [existingAssignment] = await transaction
           .select({ id: counselorAssignments.id })
           .from(counselorAssignments)
@@ -559,6 +589,7 @@ export async function seedDevelopmentData() {
     console.log("ARISE development data seeded.");
     console.log(`Faculty actor ID: ${result.accountIds.faculty}`);
     console.log(`Counselor actor ID: ${result.accountIds.counselor}`);
+    console.log(`Registrar actor ID: ${result.accountIds.registrar}`);
     for (const actor of demoActors.filter((item) => item.role === "student")) {
       console.log(`${actor.key} actor ID: ${result.accountIds[actor.key]}`);
     }

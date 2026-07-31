@@ -40,6 +40,15 @@ export function forbidden(
   return new AppError(403, "FORBIDDEN", message);
 }
 
+export function consentRequired(policy: Record<string, unknown>) {
+  return new AppError(
+    403,
+    "CONSENT_REQUIRED",
+    "Current privacy consent is required for this action",
+    { policy },
+  );
+}
+
 export function notFound(message = "The requested resource was not found") {
   return new AppError(404, "NOT_FOUND", message);
 }

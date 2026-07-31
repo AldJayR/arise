@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { getDevelopmentActorId } from "@/server/auth/actor";
 import { AppError, serializeError } from "@/server/http/errors";
 import {
   bulkAttendanceSubmissionSchema,
@@ -49,14 +48,6 @@ describe("backend foundations", () => {
     expect(
       supportSignalInputSchema.safeParse({ studentId: sectionId }).success,
     ).toBe(false);
-  });
-
-  it("requires a development actor UUID outside production", () => {
-    const request = new Request("http://localhost/api");
-    expect(() => getDevelopmentActorId(request)).toThrow(AppError);
-    expect(() => getDevelopmentActorId(request)).toThrowError(
-      "A valid x-arise-actor-id header is required",
-    );
   });
 
   it("serializes unexpected errors without exposing internal details", () => {

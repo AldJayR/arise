@@ -13,6 +13,11 @@ export async function provisionApplicationRoles() {
         arise_app_dean, arise_app_service, arise_app_auditor, arise_app_admin
     `);
     await db.execute(sql`
+      grant select, insert, update, delete on public."user", public.account,
+        public.session, public.verification
+      to arise_app_service, arise_app_admin
+    `);
+    await db.execute(sql`
       grant select on all tables in schema identity, academic, services, risk, integration
       to arise_app_user, arise_app_faculty, arise_app_counselor, arise_app_registrar, arise_app_dean
     `);

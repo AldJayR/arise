@@ -1,20 +1,24 @@
 import { eq } from "drizzle-orm";
-import { z } from "zod";
 import {
   type Database,
+  type DatabaseRole,
   getDatabase,
+  withAuthBootstrap,
   type RlsContext,
   type RlsTransaction,
   withRlsContext,
 } from "@/db/client";
 import {
   employees,
+  permissions,
   roles as identityRoles,
   persons,
+  rolePermissions,
   students,
   userAccounts,
   userRoles,
 } from "@/db/schema";
+import { auth } from "@/lib/auth";
 import { forbidden, unauthorized } from "@/server/http/errors";
 
 export type ActorRole =
@@ -33,32 +37,67 @@ export type Actor = {
   studentId?: string;
   employeeId?: string;
   roles: string[];
+  permissions: string[];
   rls: RlsContext;
 };
 
-const actorIdSchema = z.uuid();
+type AuthSession = {
+  user: {
+    id: string;
+    emailVerified: boolean;
+  };
+};
 
-export function getDevelopmentActorId(request: Request) {
-  if (process.env.NODE_ENV === "production") {
-    throw unauthorized("Development actor headers are disabled in production");
+export type SessionProvider = {
+  getSession: (options: { headers: Headers }) => Promise<AuthSession | null>;
+};
+
+const defaultSessionProvider: SessionProvider = {
+  getSession: ({ headers }) =>
+    auth.api.getSession({ headers }) as Promise<AuthSession | null>,
+};
+
+const databaseRoleByActorRole: ReadonlyArray<readonly [string, DatabaseRole]> = [
+  ["admin", "arise_app_admin"],
+  ["service", "arise_app_service"],
+  ["registrar", "arise_app_registrar"],
+  ["dean", "arise_app_dean"],
+  ["auditor", "arise_app_auditor"],
+  ["counselor", "arise_app_counselor"],
+  ["faculty", "arise_app_faculty"],
+  ["student", "arise_app_user"],
+];
+
+export function selectDatabaseRole(roles: string[]): DatabaseRole {
+  for (const [role, databaseRole] of databaseRoleByActorRole) {
+    if (roles.includes(role)) {
+      return databaseRole;
+    }
   }
 
-  const result = actorIdSchema.safeParse(
-    request.headers.get("x-arise-actor-id"),
-  );
-
-  if (!result.success) {
-    throw unauthorized("A valid x-arise-actor-id header is required");
-  }
-
-  return result.data;
+  throw unauthorized("The actor has no supported database role");
 }
 
-export async function resolveActor(
-  request: Request,
-  database: Database = getDatabase(),
+function isInactiveIdentity(identity: {
+  accountStatus: string;
+  personStatus: string;
+  studentId: string | null;
+  studentStatus: string | null;
+  employeeId: string | null;
+  employeeStatus: string | null;
+}) {
+  return (
+    identity.accountStatus !== "active" ||
+    identity.personStatus !== "active" ||
+    (identity.studentId !== null && identity.studentStatus !== "active") ||
+    (identity.employeeId !== null && identity.employeeStatus !== "active")
+  );
+}
+
+async function loadActorByAuthenticationSubject(
+  database: Database | RlsTransaction,
+  authenticationSubject: string,
 ): Promise<Actor> {
-  const userAccountId = getDevelopmentActorId(request);
   const [identity] = await database
     .select({
       userAccountId: userAccounts.id,
@@ -74,46 +113,73 @@ export async function resolveActor(
     .innerJoin(persons, eq(persons.id, userAccounts.personId))
     .leftJoin(students, eq(students.personId, persons.id))
     .leftJoin(employees, eq(employees.personId, persons.id))
-    .where(eq(userAccounts.id, userAccountId))
+    .where(eq(userAccounts.authenticationSubject, authenticationSubject))
     .limit(1);
 
-  if (!identity) {
-    throw unauthorized("The development actor is invalid or inactive");
-  }
-
-  if (
-    identity.accountStatus !== "active" ||
-    identity.personStatus !== "active" ||
-    (identity.studentId && identity.studentStatus !== "active") ||
-    (identity.employeeId && identity.employeeStatus !== "active")
-  ) {
-    throw unauthorized("The development actor is invalid or inactive");
+  if (!identity || isInactiveIdentity(identity)) {
+    throw unauthorized("The authenticated identity is invalid or inactive");
   }
 
   const roleRows = await database
-    .select({ code: identityRoles.code })
+    .select({
+      roleCode: identityRoles.code,
+      permissionCode: permissions.code,
+    })
     .from(userRoles)
     .innerJoin(identityRoles, eq(identityRoles.id, userRoles.roleId))
-    .where(eq(userRoles.userAccountId, userAccountId));
+    .leftJoin(rolePermissions, eq(rolePermissions.roleId, identityRoles.id))
+    .leftJoin(permissions, eq(permissions.id, rolePermissions.permissionId))
+    .where(eq(userRoles.userAccountId, identity.userAccountId));
 
-  if (roleRows.length === 0) {
-    throw unauthorized("The development actor has no assigned role");
+  const roles = [
+    ...new Set(roleRows.map((row) => row.roleCode)),
+  ];
+  if (roles.length === 0) {
+    throw unauthorized("The authenticated identity has no assigned role");
   }
 
-  const roles = roleRows.map((role) => role.code);
+  const permissionsList = [
+    ...new Set(
+      roleRows.flatMap((row) =>
+        row.permissionCode ? [row.permissionCode] : [],
+      ),
+    ),
+  ];
+  const databaseRole = selectDatabaseRole(roles);
+
   return {
     userAccountId: identity.userAccountId,
     personId: identity.personId,
     studentId: identity.studentId ?? undefined,
     employeeId: identity.employeeId ?? undefined,
     roles,
+    permissions: permissionsList,
     rls: {
       userAccountId: identity.userAccountId,
+      databaseRole,
       personId: identity.personId,
       studentId: identity.studentId ?? undefined,
       employeeId: identity.employeeId ?? undefined,
     },
   };
+}
+
+export async function resolveAuthenticatedActor(
+  request: Request,
+  database?: Database,
+  sessionProvider: SessionProvider = defaultSessionProvider,
+): Promise<Actor> {
+  const session = await sessionProvider.getSession({
+    headers: request.headers,
+  });
+
+  if (!session || !session.user.id || !session.user.emailVerified) {
+    throw unauthorized("A verified Better Auth session is required");
+  }
+
+  return withAuthBootstrap(database ?? getDatabase(), (transaction) =>
+    loadActorByAuthenticationSubject(transaction, session.user.id),
+  );
 }
 
 export function requireActorRole(actor: Actor, role: ActorRole) {
@@ -128,7 +194,7 @@ export async function withActorTransaction<T>(
   database?: Database,
 ) {
   const resolvedDatabase = database ?? getDatabase();
-  const actor = await resolveActor(request, resolvedDatabase);
+  const actor = await resolveAuthenticatedActor(request, resolvedDatabase);
 
   return withRlsContext(resolvedDatabase, actor.rls, (transaction) =>
     work(transaction, actor),

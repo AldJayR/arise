@@ -1,4 +1,5 @@
 export * from "./academic";
+export * from "./auth";
 export * from "./enums";
 export * from "./governance";
 export * from "./identity";

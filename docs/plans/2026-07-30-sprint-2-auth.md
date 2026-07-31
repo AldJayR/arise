@@ -75,6 +75,7 @@ No public registration, client-supplied ARISE account IDs, client-supplied stude
 Add the following to `.env.example` and document them without committing secrets:
 
 ```text
+AUTH_DATABASE_URL=<optional-least-privileged-auth-database-connection>
 BETTER_AUTH_SECRET=<minimum-32-character-secret>
 BETTER_AUTH_URL=http://localhost:3000
 RESEND_API_KEY=<resend-api-key>
@@ -83,6 +84,8 @@ AUTH_TRUSTED_ORIGINS=http://localhost:3000
 ```
 
 Production must use HTTPS, secure cookies, a production trusted-origin allowlist, a Resend verified sender/domain, and a secret managed outside source control.
+
+`AUTH_DATABASE_URL` may point to a separate least-privileged connection that can access only Better Auth tables. When omitted, local development falls back to `DATABASE_URL`.
 
 ## Implementation Guardrails
 
