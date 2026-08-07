@@ -1,4 +1,4 @@
-import { requireActorRole, withActorTransaction } from "@/server/auth/actor";
+import { withActorTransaction } from "@/server/auth/actor";
 import { parseInput } from "@/server/http/request";
 import { errorResponse, jsonResponse } from "@/server/http/response";
 import { getCounselorCase } from "@/server/services/interventions";
@@ -13,7 +13,6 @@ export async function GET(request: Request, context: RouteContext) {
       await context.params,
     );
     return await withActorTransaction(request, async (transaction, actor) => {
-      requireActorRole(actor, "counselor");
       return jsonResponse(
         await getCounselorCase(transaction, actor, params.caseId),
       );

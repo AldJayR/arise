@@ -1,8 +1,8 @@
 # Sprint 1 Backend Implementation Plan
 
-**Status:** Complete for the agreed prototype scope.
+**Status:** Historical prototype milestone; not a full verification report.
 
-The implementation covers the backend foundations, development seed, faculty academic workflows, rule-based risk evaluation, student dashboard, confidential support signals, counselor queue, auditing, and API documentation. Integration tests and `pnpm build` are explicitly outside the accepted Sprint 1 verification scope.
+The implementation covers the backend foundations, development seed, faculty academic workflows, rule-based risk evaluation, student dashboard, confidential support signals, counselor queue, auditing, and API documentation. The original milestone excluded integration tests and `pnpm build`; those exclusions must not be read as evidence that the complete repository is verified.
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 

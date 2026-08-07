@@ -1,7 +1,26 @@
 import { describe, expect, it, vi } from "vitest";
-import { sendProvisioningEmails } from "@/server/services/auth-provisioning";
+
+const { deleteUser } = vi.hoisted(() => ({ deleteUser: vi.fn() }));
+
+vi.mock("@/lib/auth", () => ({
+  auth: {
+    $context: Promise.resolve({ internalAdapter: { deleteUser } }),
+    api: {},
+  },
+}));
+
+import {
+  cleanupAuthUser,
+  sendProvisioningEmails,
+} from "@/server/services/auth-provisioning";
 
 describe("authentication provisioning", () => {
+  it("cleans up an auth user through the server-only adapter", async () => {
+    await cleanupAuthUser("orphaned-user");
+
+    expect(deleteUser).toHaveBeenCalledWith("orphaned-user");
+  });
+
   it("starts password setup and email verification without exposing tokens", async () => {
     const authApi = {
       requestPasswordReset: vi.fn().mockResolvedValue(undefined),

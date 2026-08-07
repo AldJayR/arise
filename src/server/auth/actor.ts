@@ -57,9 +57,8 @@ const defaultSessionProvider: SessionProvider = {
     auth.api.getSession({ headers }) as Promise<AuthSession | null>,
 };
 
-const databaseRoleByActorRole: ReadonlyArray<readonly [string, DatabaseRole]> = [
+const databaseRoleByPortalRole: ReadonlyArray<readonly [string, DatabaseRole]> = [
   ["admin", "arise_app_admin"],
-  ["service", "arise_app_service"],
   ["registrar", "arise_app_registrar"],
   ["dean", "arise_app_dean"],
   ["auditor", "arise_app_auditor"],
@@ -69,7 +68,7 @@ const databaseRoleByActorRole: ReadonlyArray<readonly [string, DatabaseRole]> = 
 ];
 
 export function selectDatabaseRole(roles: string[]): DatabaseRole {
-  for (const [role, databaseRole] of databaseRoleByActorRole) {
+  for (const [role, databaseRole] of databaseRoleByPortalRole) {
     if (roles.includes(role)) {
       return databaseRole;
     }

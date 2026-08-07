@@ -1,4 +1,4 @@
-import { requireActorRole, withActorTransaction } from "@/server/auth/actor";
+import { withActorTransaction } from "@/server/auth/actor";
 import { parseInput, parseJson } from "@/server/http/request";
 import { createdResponse, errorResponse } from "@/server/http/response";
 import { appendCaseStatus } from "@/server/services/interventions";
@@ -17,7 +17,6 @@ export async function POST(request: Request, context: RouteContext) {
     );
     const input = await parseJson(request, caseStatusInputSchema);
     return await withActorTransaction(request, async (transaction, actor) => {
-      requireActorRole(actor, "counselor");
       return createdResponse({
         status: await appendCaseStatus(
           transaction,

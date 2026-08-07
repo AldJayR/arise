@@ -202,7 +202,7 @@ async function getOrCreateAccount(
           email: actor.email,
           name: `${actor.givenName} ${actor.familyName}`,
           password: randomBytes(32).toString("base64url"),
-          role: actor.role === "registrar" ? "admin" : "user",
+          role: "user",
         },
       })
     ).user.id;
@@ -214,14 +214,10 @@ async function getOrCreateAccount(
         .set({ authenticationSubject })
         .where(eq(userAccounts.id, existing.id));
     }
-    if (
-      existingAuthUser &&
-      actor.role === "registrar" &&
-      existingAuthUser.role !== "admin"
-    ) {
+    if (existingAuthUser && existingAuthUser.role !== "user") {
       await transaction
         .update(authUsers)
-        .set({ role: "admin" })
+        .set({ role: "user" })
         .where(eq(authUsers.id, existingAuthUser.id));
     }
     return existing.id;

@@ -5,7 +5,6 @@ import {
   gradeSubmissionSchema,
   sessionCreationSchema,
 } from "@/server/validation/faculty";
-import { supportSignalInputSchema } from "@/server/validation/student";
 
 const sectionId = "00000000-0000-4000-8000-000000000001";
 const enrollmentId = "00000000-0000-4000-8000-000000000002";
@@ -41,13 +40,6 @@ describe("backend foundations", () => {
     });
 
     expect(result.success).toBe(false);
-  });
-
-  it("allows an empty support signal payload but rejects client-controlled fields", () => {
-    expect(supportSignalInputSchema.safeParse({}).success).toBe(true);
-    expect(
-      supportSignalInputSchema.safeParse({ studentId: sectionId }).success,
-    ).toBe(false);
   });
 
   it("serializes unexpected errors without exposing internal details", () => {

@@ -2,7 +2,7 @@
 
 ARISE is a Next.js prototype backend for academic risk intelligence and student support workflows.
 
-Sprint 1 is complete for the agreed prototype scope.
+The original Sprint 1 prototype scope is implemented; full integration and deployment verification remain separate work.
 
 Sprint 2 implements Better Auth email/password access, registrar-provisioned accounts, Resend activation emails, student privacy-consent gating, and authenticated RBAC/RLS context.
 
@@ -35,5 +35,7 @@ Protected API routes resolve Better Auth session cookies and map the authenticat
 ## Scope
 
 Sprint 1 domain workflows remain available behind Better Auth sessions. Sprint 2 adds registrar provisioning, activation/reset and verification delivery, authenticated ARISE RBAC/RLS context, and student privacy-consent gating. Sprint 3 adds the smallest referral-to-case workflow with server-resolved counselor ownership, status tracking, and attributed intervention notes. Direct messaging, reminders, notifications, digests, UI portals, integrations, and analytics remain deferred. See [`docs/api/sprint-1.md`](docs/api/sprint-1.md), [`docs/api/sprint-2-auth.md`](docs/api/sprint-2-auth.md), [`docs/api/sprint-3-interventions.md`](docs/api/sprint-3-interventions.md), and [`docs/requirements.md`](docs/requirements.md).
+
+This repository is a prototype, not a production compliance package. Deployment TLS, encryption at rest, retention, complete read/export audit coverage, and operational audit verification require separate implementation and infrastructure controls.
 
 See [`docs/plans/2026-07-31-sprint-3-interventions.md`](docs/plans/2026-07-31-sprint-3-interventions.md) for the Sprint 3 implementation plan.

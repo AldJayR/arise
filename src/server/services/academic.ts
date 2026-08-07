@@ -92,12 +92,6 @@ async function getOwnedSection(
   throw forbidden("The faculty actor is not assigned to this section");
 }
 
-function assertDistinctIds(ids: string[], resourceName: string) {
-  if (new Set(ids).size !== ids.length) {
-    throw badRequest(`${resourceName} must not contain duplicate IDs`);
-  }
-}
-
 export async function listFacultySections(
   transaction: RlsTransaction,
   actor: Actor,
@@ -279,7 +273,6 @@ export async function recordAttendance(
   const employeeId = requireFacultyEmployee(actor);
   await getOwnedSection(transaction, actor, sectionId);
   const enrollmentIds = input.entries.map((entry) => entry.enrollmentId);
-  assertDistinctIds(enrollmentIds, "Attendance entries");
   const matchingEnrollments = await validateAttendanceTarget(
     transaction,
     sectionId,
@@ -361,7 +354,6 @@ export async function recordGrades(
   const employeeId = requireFacultyEmployee(actor);
   await getOwnedSection(transaction, actor, sectionId);
   const enrollmentIds = input.entries.map((entry) => entry.enrollmentId);
-  assertDistinctIds(enrollmentIds, "Grade entries");
 
   const [period] = await transaction
     .select({ id: gradePeriods.id, code: gradePeriods.code })

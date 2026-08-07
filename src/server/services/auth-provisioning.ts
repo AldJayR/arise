@@ -17,7 +17,7 @@ import type { AuthUserProvisioningInput } from "@/server/validation/auth";
 
 export type AuthProvisioningApi = Pick<
   typeof auth.api,
-  "createUser" | "banUser" | "requestPasswordReset" | "sendVerificationEmail"
+  "createUser" | "requestPasswordReset" | "sendVerificationEmail"
 >;
 
 type AuthEmailApi = {
@@ -52,6 +52,11 @@ type ProvisionedAuthUser = {
 
 function createUnusablePassword() {
   return randomBytes(32).toString("base64url");
+}
+
+export async function cleanupAuthUser(userId: string) {
+  const context = await auth.$context;
+  await context.internalAdapter.deleteUser(userId);
 }
 
 async function findIdentity(
@@ -107,26 +112,10 @@ function assertIdentityMatchesProfile(
   }
 }
 
-async function disableCreatedAuthUser(
-  authApi: AuthProvisioningApi,
-  userId: string,
-  headers: Headers,
-) {
-  try {
-    await authApi.banUser({
-      body: { userId, banReason: "ARISE provisioning link failed" },
-      headers,
-    });
-  } catch {
-    // The account remains unusable because it has no ARISE identity link.
-  }
-}
-
 export async function provisionAuthUser(
   transaction: RlsTransaction,
   actor: Actor,
   input: AuthUserProvisioningInput,
-  headers: Headers,
   authApi: AuthProvisioningApi = auth.api,
 ): Promise<ProvisionedAuthUser> {
   const identity = await findIdentity(transaction, input);
@@ -167,7 +156,6 @@ export async function provisionAuthUser(
         password: createUnusablePassword(),
         role: "user",
       },
-      headers,
     });
     authenticationSubject = createdUser.user.id;
 
@@ -200,7 +188,7 @@ export async function provisionAuthUser(
     });
   } catch (error) {
     if (authenticationSubject) {
-      await disableCreatedAuthUser(authApi, authenticationSubject, headers);
+      await cleanupAuthUser(authenticationSubject).catch(() => undefined);
     }
     throw error;
   }

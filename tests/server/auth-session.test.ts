@@ -31,12 +31,19 @@ describe("authenticated actor resolution", () => {
 });
 
 describe("database role selection", () => {
-  it("selects the most privileged fixed role from server-owned ARISE roles", () => {
+  it("selects a deterministic portal role without accepting internal roles", () => {
     expect(selectDatabaseRole(["student", "faculty"])).toBe(
       "arise_app_faculty",
     );
     expect(selectDatabaseRole(["counselor", "registrar"])).toBe(
       "arise_app_registrar",
+    );
+    expect(selectDatabaseRole(["admin"])).toBe("arise_app_admin");
+  });
+
+  it("does not accept internal execution roles", () => {
+    expect(() => selectDatabaseRole(["service"])).toThrow(
+      "The actor has no supported database role",
     );
   });
 

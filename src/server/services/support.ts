@@ -15,7 +15,6 @@ import {
   appendInitialCaseStatus,
   createAssignedCase,
 } from "@/server/services/interventions";
-import type { SupportSignalInput } from "@/server/validation/student";
 
 function requireStudent(actor: Actor) {
   requireActorRole(actor, "student");
@@ -28,7 +27,6 @@ function requireStudent(actor: Actor) {
 export async function createSupportSignal(
   transaction: RlsTransaction,
   actor: Actor,
-  _input: SupportSignalInput,
 ) {
   const studentId = requireStudent(actor);
   requireActorPermission(actor, "student:support-signal");

@@ -20,7 +20,7 @@ export async function POST(request: Request) {
       database,
       { ...actor.rls, databaseRole: "arise_app_service" },
       (transaction) =>
-        provisionAuthUser(transaction, actor, input, request.headers),
+        provisionAuthUser(transaction, actor, input),
     );
 
     await sendProvisioningEmails(result.email);
